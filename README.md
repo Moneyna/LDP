@@ -1,5 +1,5 @@
 This is the official PyTorch codes for the paper  
-LDP: A Lightweight Denoising Plugin for Enhancing Generalization in Single-Image Super-Resolution
+LDP: A Lightweight Denoising Plugin Enhancing Generalization in Single-Image Super-Resolution
 
 
 ## Train the model
