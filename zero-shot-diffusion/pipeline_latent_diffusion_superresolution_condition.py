@@ -21,7 +21,7 @@ from diffusers.schedulers import (
 from diffusers.utils import PIL_INTERPOLATION, is_torch_xla_available
 from diffusers.utils.torch_utils import randn_tensor
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline, ImagePipelineOutput
-from LDPSR_arch import LDPSR
+from LDP_arch import LDP
 
 if is_torch_xla_available():
     import torch_xla.core.xla_model as xm
@@ -77,7 +77,7 @@ class LDMSuperResolutionPipeline_cond(DiffusionPipeline):
         
 
     def init_condition(self,model_path,dps_scale):
-        self.ldpsr_model = LDPSR(in_nc=3, out_nc=3, upscele=4,
+        self.ldp_model = LDP(in_nc=3, out_nc=3, upscele=4,
                                Nd=32,
                                d_model=64,
                                DP_depth=2,
@@ -86,8 +86,7 @@ class LDMSuperResolutionPipeline_cond(DiffusionPipeline):
                                diffusion_batch_mul=1,
                                num_sampling_steps='200',
                                ).to(self.device)
-        self.ldpsr_model.load_state_dict(torch.load(model_path)['params'], strict=True)
-        #self.ldpsr_model.eval()
+        self.ldp_model.load_state_dict(torch.load(model_path)['params'], strict=True)
         self.dps_scale = dps_scale
 
 
@@ -95,7 +94,6 @@ class LDMSuperResolutionPipeline_cond(DiffusionPipeline):
         H_lq, W_lq = lq.shape[2], lq.shape[3]
         H_up, W_up = x_up.shape[2], x_up.shape[3]
 
-        # 如果尺寸不同，对 x_up 进行裁剪或填充
         if H_up > H_lq:
             x_up = x_up[:, :, :H_lq, :]
         if W_up > W_lq:
@@ -103,10 +101,10 @@ class LDMSuperResolutionPipeline_cond(DiffusionPipeline):
 
         if H_up < H_lq:
             pad_h = H_lq - H_up
-            x_up = F.pad(x_up, (0, 0, 0, pad_h))  # 只在高度方向填充
+            x_up = F.pad(x_up, (0, 0, 0, pad_h))
         if W_up < W_lq:
             pad_w = W_lq - W_up
-            x_up = F.pad(x_up, (0, pad_w, 0, 0))  # 只在宽度方向填充
+            x_up = F.pad(x_up, (0, pad_w, 0, 0))
         return lq-x_up
 
     def init_image_residual(self, image):
@@ -121,23 +119,16 @@ class LDMSuperResolutionPipeline_cond(DiffusionPipeline):
     def grad_and_value(self, x_tp1,x_t, x_0_hat,lq_ori, **kwargs):
 
         lq_ori = (lq_ori+1.0)/2.0
-        # 将X_0_hat变成图片
-        #print("x0_latent.requires_grad:",x_0_hat.requires_grad)
         image = self.vqvae.decode(x_0_hat).sample
-        #print("x0.requires_grad:",image.requires_grad)
         image = torch.clamp(image, -1.0, 1.0)
 
-        #TODO: dualdsr
-        self.ldpsr_model = self.ldpsr_model.to(x_tp1.device)
+        self.ldp_model = self.ldp_model.to(x_tp1.device)
         image = image.to(x_tp1.device)
         self.LR_input = self.LR_input.to(x_tp1.device)
 
-        lq_pred = self.ldpsr_model(self.LR_input,image,True)
+        lq_pred = self.ldp_model(self.LR_input,image,True)
         lq_pred = (lq_pred +1.0) /2.0
 
-
-        # difference = self.resize_lq(lq_ori,lq_pred)
-        # norm = torch.linalg.norm(difference)
         norm = self.dps_loss(lq_pred,lq_ori)
         norm_grad = torch.autograd.grad(outputs=norm, inputs=x_t)[0]
         x_tp1 -= norm_grad * self.dps_scale
@@ -224,10 +215,7 @@ class LDMSuperResolutionPipeline_cond(DiffusionPipeline):
 
         if isinstance(image, PIL.Image.Image):
             image = preprocess(image).to(self.device)
-            # image = image.requires_grad_(True)
-            #print("[1] image.requires_grad:",image.requires_grad)
             self.init_image_residual(image)
-            #print("[1.1] image.requires_grad:",image.requires_grad)
 
         if duald_path != None:
             self.init_condition(duald_path)
@@ -240,11 +228,6 @@ class LDMSuperResolutionPipeline_cond(DiffusionPipeline):
 
         latents = randn_tensor(latents_shape, generator=generator, device=self.device, dtype=latents_dtype)
         latents = latents.requires_grad_(True)
-        #print("[2] latents.requires_grad:",latents.requires_grad)
-
-        #image = image.to(device=self.device, dtype=latents_dtype)
-        #image = image.to(device=self.device)
-        #print("[1.2] image.requires_grad:",image.requires_grad)
 
         # set timesteps and move to the correct device
         self.scheduler.set_timesteps(num_inference_steps, device=self.device)
@@ -252,7 +235,6 @@ class LDMSuperResolutionPipeline_cond(DiffusionPipeline):
 
         # scale the initial noise by the standard deviation required by the scheduler
         #latents = latents * self.scheduler.init_noise_sigma
-        #print("[2.1] latents.requires_grad:",latents.requires_grad)
 
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature.
         # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
@@ -263,29 +245,17 @@ class LDMSuperResolutionPipeline_cond(DiffusionPipeline):
         if accepts_eta:
             extra_kwargs["eta"] = eta
 
-        # for t in self.progress_bar(timesteps_tensor):
         for t in timesteps_tensor:
             # concat latents and low resolution image in the channel dimension.
-            #print("[1.3] image.requires_grad:",image.requires_grad," [2.2] latents.requires_grad:",latents.requires_grad)
             latents = latents.requires_grad_()
             latents_input = torch.cat([latents, image], dim=1).requires_grad_(True)
-            #print("[3] latents_input.requires_grad:",latents_input.requires_grad)
-            #latents_input = self.scheduler.scale_model_input(latents_input, t)
-            # predict the noise residual
-            #print("latents_input.requires_grad:",latents_input.requires_grad," latents.requires_grad:",latents.requires_grad," iamge.requries.grad=",image.requires_grad)
-            #with torch.enable_grad():
             noise_pred = self.unet(latents_input, t,return_dict=False)[0] #.sample
-            #print("[noise]noise_pred.requires_grad:",noise_pred.requires_grad)
             # compute the previous noisy sample x_t -> x_t-1
-            #with torch.enable_grad():
             latents_param = self.scheduler.step(noise_pred, t, latents, **extra_kwargs)
             latents1,x0_pred=latents_param[0],latents_param[1]
-            #print("latents1.requires_grad:",latents1.requires_grad," x0_pred.requires_grad:",x0_pred.requires_grad)
-            
-            #x_tp1,x_t, x_0_hat, **kwargs)
+
             latents, distance = self.grad_and_value(latents1,latents,x0_pred,image)
             latents = latents.detach_()
-            print("distance=",distance)
 
             if XLA_AVAILABLE:
                 xm.mark_step()

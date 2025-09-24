@@ -297,18 +297,14 @@ def shift_pixel(x, sf, upper_left=True):
     x1 = np.clip(x1, 0, w - 1)
     y1 = np.clip(y1, 0, h - 1)
 
-    # 创建插值点网格
     xv_interp, yv_interp = np.meshgrid(x1, y1, indexing='xy')
-    points = np.array([yv_interp.ravel(), xv_interp.ravel()]).T  # 注意：RegularGridInterpolator 的插值点需要是 (y, x)
+    points = np.array([yv_interp.ravel(), xv_interp.ravel()]).T
 
-    # 创建插值器
     if x.ndim == 2:
-        # 二维数据
         interpolator = RegularGridInterpolator((yv, xv), x, method="linear", bounds_error=False, fill_value=None)
         x_interpolated = interpolator(points)
         x = x_interpolated.reshape(h, w)
     elif x.ndim == 3:
-        # 三维数据（多通道）
         for i in range(x.shape[-1]):
             interpolator = RegularGridInterpolator((yv, xv), x[:, :, i], method="linear", bounds_error=False,
                                                    fill_value=None)

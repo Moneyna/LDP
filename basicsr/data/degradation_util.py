@@ -816,7 +816,6 @@ def degradationBenchmark(img, sf=4, lq_patchsize_h=72,lq_patchsize_w=72, isp_mod
     if d_mode == 'bsrgan':
         return degradation_bsrgan(img,sf,lq_patchsize_h,lq_patchsize_w,isp_model,use_crop)
 
-    #TODO: 四种类型的degaration，1. 上下采样；2. 噪声； 3. blur 4. JPEG
     isp_prob, jpeg_prob, scale2_prob = 0.25, 0.9, 0.25
     sf_ori = sf
 
@@ -859,7 +858,6 @@ def degradationBenchmark(img, sf=4, lq_patchsize_h=72,lq_patchsize_w=72, isp_mod
     elif d_mode == 'noise':
         shuffle_order = random.sample(range(3), 3)
         for i in shuffle_order:
-            # print("i=",i)
             if i == 0:
                 # add Gaussian noise
                 img = add_Gaussian_noise(img, noise_level1=2, noise_level2=25)
@@ -915,7 +913,6 @@ def degradationBenchmarkPlus(img, sf=4, shuffle_prob=0.5, use_sharp=True, lq_pat
 
     poisson_prob, speckle_prob, isp_prob = 0.1, 0.1, 0.1
     isp_prob, jpeg_prob, scale2_prob = 0.25, 0.9, 0.25
-    #TODO: 四种类型的degaration，1. 上下采样；2. 噪声； 3. blur 4. JPEG
     h1, w1 = img.shape[:2]
     img = img.copy()[:h1 - h1 % sf, :w1 - w1 % sf, ...]  # mod crop
     h, w = img.shape[:2]
@@ -956,7 +953,6 @@ def degradationBenchmarkPlus(img, sf=4, shuffle_prob=0.5, use_sharp=True, lq_pat
     elif d_mode == 'noise':
         shuffle_order = random.sample(range(6), 6)
         for i in shuffle_order:
-            # print("i=",i)
             if i == 0:
                 # add Gaussian noise
                 img = add_Gaussian_noise(img, noise_level1=2, noise_level2=25)
@@ -983,7 +979,6 @@ def degradationBenchmarkPlus(img, sf=4, shuffle_prob=0.5, use_sharp=True, lq_pat
     elif d_mode == 'blur':
         shuffle_order = random.sample(range(2), 2)
         for i in shuffle_order:
-            # print("i=",i)
             if i == 0:
                 img = add_blur(img, sf=sf)
                 img = add_blur(img, sf=sf)
@@ -993,7 +988,6 @@ def degradationBenchmarkPlus(img, sf=4, shuffle_prob=0.5, use_sharp=True, lq_pat
     elif d_mode == 'JPEG':
         shuffle_order = random.sample(range(2), 2)
         for i in shuffle_order:
-            # print("i=",i)
             if i == 0:
                 img = add_JPEG_noise(img)
             elif i==1:

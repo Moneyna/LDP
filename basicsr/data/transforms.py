@@ -61,12 +61,8 @@ def paired_random_crop(img_gts, img_lqs, gt_patch_size, scale, gt_path=None):
     lq_patch_size = gt_patch_size // scale
 
     if h_gt != h_lq * scale or w_gt != w_lq * scale:
-        #h_gt=h_lq*scale
-        #w_gt=w_lq*scale
         h_lq=h_gt//scale
         w_lq=w_gt//scale
-        #raise ValueError(f'Scale mismatches. GT ({h_gt}, {w_gt}) is not {scale}x ',
-        #                 f'multiplication of LQ ({h_lq}, {w_lq}).')
     if h_lq < lq_patch_size or w_lq < lq_patch_size:
         raise ValueError(f'LQ ({h_lq}, {w_lq}) is smaller than patch size '
                          f'({lq_patch_size}, {lq_patch_size}). '

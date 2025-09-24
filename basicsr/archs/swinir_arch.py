@@ -100,12 +100,8 @@ class WindowAttention(nn.Module):
         relative_coords[:, :, 1] += self.window_size[1] - 1
         relative_coords[:, :, 0] *= 2 * self.window_size[1] - 1
         relative_position_index = relative_coords.sum(-1)  # Wh*Ww, Wh*Ww
-        #for i in range(relative_position_index.shape[0]):
-        #    for j in range(relative_position_index.shape[1]):
-        #        if relative_position_index[i,j] > self.relative_position_bias_table.shape[0]:
-        #           relative_position_index[i,j]  = relative_position_index[i,j]  % self.relative_position_bias_table.shape[0]
+
         self.register_buffer("relative_position_index", relative_position_index)
-        #print("self.relative_position_index=",self.relative_position_index)
 
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
@@ -129,12 +125,6 @@ class WindowAttention(nn.Module):
         q = q * self.scale
         attn = (q @ k.transpose(-2, -1))
 
-        #print("self.relative_position_index=",self.relative_position_index)
-        #print("self.relative_position_index.view(-1)=",self.relative_position_index.view(-1))
-        #print("self.relative_positon_bias_table.shape=",self.relative_position_bias_table.shape)
-        #print("???",torch.any(torch.eq(self.relative_position_index.view(-1),2067)))
-        #if torch.any( self.relative_position_index.view(-1) >= self.relative_position_bias_table.shape[0]):
-        #    self.relative_position_index[self.relative_position_index>=self.relative_position_bias_table.shape[0]]=self.relative_position_bias_table.shape[0]-1
         relative_position_bias = self.relative_position_bias_table[self.relative_position_index.view(-1)].view(
             self.window_size[0] * self.window_size[1], self.window_size[0] * self.window_size[1], -1)  # Wh*Ww,Wh*Ww,nH
         relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()  # nH, Wh*Ww, Wh*Ww
@@ -874,7 +864,6 @@ class SwinIR(nn.Module):
 
         # start with black image
         output = input.new_zeros(output_shape)
-        # print("output.shape=",output.shape)
         tiles_x = math.ceil(width / tile_size)
         tiles_y = math.ceil(height / tile_size)
 
@@ -904,8 +893,6 @@ class SwinIR(nn.Module):
 
                 # upscale tile
                 output_tile = self.test(input_tile)
-                # output_tile = output_tile[-1]
-                # print("tile.shape=",output_tile.shape)
 
                 # output tile area on total image
                 output_start_x = input_start_x * self.upscale
@@ -927,24 +914,15 @@ class SwinIR(nn.Module):
 
     @torch.no_grad()
     def test(self, input):
-        # org_use_semantic_loss = self.use_semantic_loss
-        # self.use_semantic_loss = False
 
         # padding to multiple of window_size * 8
-        # TODO：学习这个pad！！
-        # print(input.shape)
         wsz = 8 // self.upscale * 16
         wsz = min(wsz, 64)
         _, _, h_old, w_old = input.shape
         h_pad = (h_old // wsz + 1) * wsz - h_old
         w_pad = (w_old // wsz + 1) * wsz - w_old
-        # print("h_pad=",h_pad)
-        # print("w_pad=", w_pad)
         input = torch.cat([input, torch.flip(input, [2])], 2)[:, :, :h_old + h_pad, :]
         input = torch.cat([input, torch.flip(input, [3])], 3)[:, :, :, :w_old + w_pad]
-        # print("[after pad]input.shape=",input.shape)
-        # print("[TEST]")
-        ##sr_result, lr_result, self.correlation(self.blurbook.weight), hr_feature, embeddings
         dec = self.forward(input)
         dec = dec[..., :h_old * self.upscale, :w_old * self.upscale]
 

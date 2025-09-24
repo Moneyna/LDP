@@ -4,10 +4,6 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-"""
-Sample new images from a pre-trained DiT.
-"""
-
 import os
 os.environ['CUDA_VISIBLE_DEVICES']="3"
 import math
@@ -163,8 +159,8 @@ def main(args,gt_h,gt_w):
     else:
         pipeline = StableDiffusionImg2ImgPipeline_cond.from_pretrained(model_id)
 
-        ldpsr_model = "/path/to/ldpsr_model.pth"
-        pipeline.init_condition(ldpsr_model,args.dps_scale) #1e-2)
+        ldp_model = "/path/to/ldp_model.pth"
+        pipeline.init_condition(ldp_model,args.dps_scale) #1e-2)
     sr_model = pipeline.to(device)
 
     if os.path.isfile(args.input):
@@ -173,8 +169,6 @@ def main(args,gt_h,gt_w):
         paths = sorted(glob.glob(os.path.join(args.input, '*.png')))
 
     text_prompt = "Ultra-detailed, high-resolution, sharp focus, perfect lighting, intricate details, 8k resolution, professional photography, crisp edges, flawless texture, hyper-realistic, cinematic clarity, noise-free, vibrant depth of field, studio quality, maximum sharpness"
-    #print("paths.len=",len(paths))
-    #TODO: 读取gt
     pbar = tqdm(total=len(paths), unit='image')
     metric_results = {
         metric: 0

@@ -93,7 +93,7 @@ class FaceRestorationHelper(object):
         num_detected_face = 0
         for idx, face in enumerate(self.cropped_faces):
             # face detection
-            det_face = self.face_detector(face, 1)  # TODO: can we remove it?
+            det_face = self.face_detector(face, 1)
             if len(det_face) == 0:
                 print(f'Cannot find faces in cropped image with index {idx}.')
                 self.all_landmarks_68.append(None)

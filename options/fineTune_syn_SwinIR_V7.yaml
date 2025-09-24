@@ -1,7 +1,6 @@
 # general settings
 name: FineTune_SwinIR_lora_V7_whole
-# name: debug_FeMaSR
-model_type: DualDiffLoss6Model
+model_type: LDPLoss6Model
 scale: 4
 num_gpu: 1 # set num_gpu: 0 for cpu mode
 manual_seed: 1
@@ -10,14 +9,14 @@ manual_seed: 1
 datasets:
   train:
     name: DF2K
-    type: BSRGANTrainDataset #PairedImageDataset
-    dataroot_gt: /home/hejunyi/data/DF2K/HR #/home/hejunyi/data/crop_512/merge/HR #/home/hejunyi/data/DF2K/HR #/home/prir1005/.prirMSERDataMountPoint3/hjy/data/crop_512/bsrgan/merge/HR #
-    dataroot_lq: /home/hejunyi/data/DF2K/LR/x4 #/home/hejunyi/data/crop_512/merge/LR/x4 #/home/hejunyi/data/DF2K/LR/x4 #/home/prir1005/.prirMSERDataMountPoint3/hjy/data/crop_512/bsrgan/merge/LR/x4
+    type: BSRGANTrainDataset
+    dataroot_gt: /data/DF2K/HR
+    dataroot_lq: /data/DF2K/LR/x4
 
     io_backend:
       type: disk
 
-    gt_size: 256 #128
+    gt_size: 256
     scale: 4
     use_resize_crop: true
     use_flip: true
@@ -25,20 +24,18 @@ datasets:
 
     # data loader
     use_shuffle: true
-    batch_size_per_gpu: &bsz 8 #15 #32 #12 #16
-    num_worker_per_gpu: 8 #*bsz
+    batch_size_per_gpu: &bsz 8
+    num_worker_per_gpu: 8
     dataset_enlarge_ratio: 1
 
     prefetch_mode: cpu
     num_prefetch_queue: 32 #*bsz
 
-  val: #TODO: 换位置，并且减少验证集数量，现在太多了
+  val:
     name: General_Image_Valid
-    type: PairedImageDataset #BSRGANTrainDataset #PairedImageDataset # BSRGANTrainDataset
-#    dataroot_gt: /home/hejunyi/data/bicubic_val2/HR
-#    dataroot_lq: /home/hejunyi/data/bicubic_val2/LR/x4
-    dataroot_gt: /home/hejunyi/data/bsrgan_plus/DIV2K_VAL/HR
-    dataroot_lq: /home/hejunyi/data/bsrgan_plus/DIV2K_VAL/LR/x4
+    type: PairedImageDataset
+    dataroot_gt: /data/bsrgan_plus/DIV2K_VAL/HR
+    dataroot_lq: /data/bsrgan_plus/DIV2K_VAL/LR/x4
 
     use_flip: False
     use_rot: False
@@ -47,7 +44,7 @@ datasets:
 
 # network structures
 network_g:
-  type: SwinIR #_lora
+  type: SwinIR
   upscale: 4
   in_chans: 3
   img_size: 64
@@ -59,34 +56,27 @@ network_g:
   mlp_ratio: 2
   upsampler: 'nearest+conv'
   resi_connection: '1conv'
-#  r: 0
-#  lora_mode: ''
-  #frozen_module_keyword: ['codebook']
 
-network_duald:
-  type: DualDSR6
+network_ldp:
+  type: LDP
   in_nc: 3
   out_nc: 3
   upscale: 4
-  d_model: 64 #224
+  d_model: 64
   Nd: 32
   DP_depth: 2
   diffloss_d: 3
-  diffloss_w: 64 #224
+  diffloss_w: 64
   diffusion_batch_mul: 1
   num_sampling_steps: '200'
 
 network_d: ~
-#network_d:
-#  type: UNetDiscriminatorSN
-#  num_in_ch: 3
 
 # path
 path:
-#  pretrain_network_g: /home/hejunyi/code/ex6/SwinIR/model_zoo/001_classicalSR_DF2K_s64w8_SwinIR-M_x4.pth
-  pretrain_network_g: /home/hejunyi/code/ex6/SwinIR/model_zoo/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x4_GAN.pth
-  pretrain_network_duald: /data/hejunyi/code/ex12/DualDSR/experiments/DualDSR6_dwtsr_bsrgan_dM64_Nd32_nst200/models/net_g_best_.pth
-  pretrain_network_d: ~ #/home/hejunyi/code/ex6/QKVCodebookV1/experiments/Version23_HQ_stage_256_512_wGAN2/models/net_d_best_.pth
+  pretrain_network_g: /code/ex6/SwinIR/model_zoo/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x4_GAN.pth
+  pretrain_network_ldp: /code/ex12/LDP/experiments/LDP_dwtsr_bsrgan_dM64_Nd32_nst200/models/net_g_best_.pth
+  pretrain_network_d: ~
   strict_load: false
   net_g_param_key: params_ema
   # resume_state: ~
@@ -95,35 +85,27 @@ path:
 train:
   optim_g:
     type: Adam
-    lr: !!float 1e-5 #8e-4 #3
+    lr: !!float 1e-5
     weight_decay: 0
     betas: [0.9, 0.99]
   optim_d:
     type: Adam
-    lr: !!float 4e-5 #4e-5 #3
+    lr: !!float 4e-5
     weight_decay: 0
     betas: [0.9, 0.99]
 
   scheduler:
     type: MultiStepLR
-    milestones: [50000,100000,150000,200000,250000,300000,350000,400000,450000,500000] #[25000,35000,45000,55000,65000,75000,85000,95000,105000,115000,125000]
-    gamma: 1 #0.8
+    milestones: [50000,100000,150000,200000,250000,300000,350000,400000,450000,500000]
+    gamma: 1
 
-  total_iter: 4000 #2000000
-  #moco_iter: 10000
+  total_iter: 1000
   warmup_iter: -1  # no warm up
 
   # losses
-#  dualdiff_opt:
-#    type: DualDiffLoss
-#    mode: ILR
-#    loss_weight: !!float 1 #1e-2 #1.0
-#    criterion: 'l1'
-#    reduction: mean
-
   pixel_opt:
-    type: L1Loss #TODO: 加入GWloss
-    loss_weight: !!float 1 #1e-2 #1.0
+    type: L1Loss
+    loss_weight: !!float 1
     reduction: mean
 
   fre_opt:
@@ -148,28 +130,22 @@ train:
     vgg_type: vgg19
     use_input_norm: true
     range_norm: false
-    perceptual_weight: 1 #1.0
+    perceptual_weight: 1
     style_weight: 0.0
     criterion: l1
 
-  #gan_opt:
-  #  type: GANLoss
-  #  gan_type: hinge
-  #  real_label_val: 1.0
-  #  fake_label_val: 0.0
-  #  loss_weight: !!float 0.1
 
   net_d_iters: 1
   net_d_init_iters: !!float 0
 
 # validation settings·
 val:
-  val_freq: !!float 1 #e3 #1e3 #500 #1e3
+  val_freq: !!float 1e3
   save_img:  True
 
   key_metric: lpips
   metrics:
-    psnr: # metric name, not used in this codebase
+    psnr:
       type: psnr
       crop_border: 0
       test_y_channel: true
@@ -182,15 +158,12 @@ val:
     lpips:
       type: lpips
       better: lower
-    #dists:
-    #  type: dists
-    #  better: lower
 
 # logging settings
 logger:
-  print_freq: 1 #00 #100
+  print_freq: 100
   save_checkpoint_freq: !!float 1e9
-  save_latest_freq: !!float 1e3 #1000 #1e3
-  show_tf_imgs_freq: !!float 1e3
+  save_latest_freq: !!float 1e3
+  show_tf_imgs_freq: !!float 1e9
   use_tb_logger: true
 

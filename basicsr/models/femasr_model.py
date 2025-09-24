@@ -26,18 +26,18 @@ class FeMaSRModel(BaseModel):
         self.net_g = self.model_to_device(self.net_g)
 
         self.scale = self.opt['scale']
-        self.diffusion_batch_mul = self.opt['network_duald']['diffusion_batch_mul']
+        self.diffusion_batch_mul = self.opt['network_ldp']['diffusion_batch_mul']
 
-        # define DualDSR
-        self.duald = build_network(opt['network_duald'])
-        self.duald = self.model_to_device(self.duald)
-        load_path = self.opt['path'].get('pretrain_network_duald', None)
+        # define LDP
+        self.ldp = build_network(opt['network_ldp'])
+        self.ldp = self.model_to_device(self.ldp)
+        load_path = self.opt['path'].get('pretrain_network_ldp', None)
         logger = get_root_logger()
         param_key = self.opt['path'].get('param_key', 'params')
         if load_path is not None:
-            logger.info(f'Loading net_duald from {load_path}')
-            self.load_network(self.duald, load_path, self.opt['path']['strict_load'], param_key=param_key)
-        # self.duald.eval()
+            logger.info(f'Loading net_ldp from {load_path}')
+            self.load_network(self.ldp, load_path, self.opt['path']['strict_load'], param_key=param_key)
+        # self.ldp.eval()
 
         # define metric functions 
         if self.opt['val'].get('metrics') is not None:
@@ -94,7 +94,6 @@ class FeMaSRModel(BaseModel):
         self.net_d = self.model_to_device(self.net_d)
         # load pretrained d models
         load_path = self.opt['path'].get('pretrain_network_d', None)
-        # print(load_path)
         if load_path is not None:
             logger.info(f'Loading net_d from {load_path}')
             self.load_network(self.net_d, load_path, self.opt['path'].get('strict_load_d', True))
@@ -159,7 +158,6 @@ class FeMaSRModel(BaseModel):
         H_lq, W_lq = lq.shape[2], lq.shape[3]
         H_up, W_up = x_up.shape[2], x_up.shape[3]
 
-        # 如果尺寸不同，对 x_up 进行裁剪或填充
         if H_up > H_lq:
             x_up = x_up[:, :, :H_lq, :]
         if W_up > W_lq:
@@ -167,10 +165,10 @@ class FeMaSRModel(BaseModel):
 
         if H_up < H_lq:
             pad_h = H_lq - H_up
-            x_up = F.pad(x_up, (0, 0, 0, pad_h))  # 只在高度方向填充
+            x_up = F.pad(x_up, (0, 0, 0, pad_h))
         if W_up < W_lq:
             pad_w = W_lq - W_up
-            x_up = F.pad(x_up, (0, pad_w, 0, 0))  # 只在宽度方向填充
+            x_up = F.pad(x_up, (0, pad_w, 0, 0))
         return lq-x_up
 
     def feed_data(self, data):
@@ -199,7 +197,7 @@ class FeMaSRModel(BaseModel):
         else:
             self.output, l_codebook, l_semantic, _ = self.net_g(self.gt)
 
-        lq_pred = self.duald(self.LR_input, self.output * 2.0 - 1.0)
+        lq_pred = self.ldp(self.LR_input, self.output * 2.0 - 1.0)
         lq_pred = (lq_pred + 1.0) / 2
 
         self.lq = self.lq.repeat(self.diffusion_batch_mul, 1, 1, 1)

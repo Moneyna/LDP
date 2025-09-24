@@ -239,7 +239,6 @@ class FeMaSRNet(nn.Module):
         self.gt_res = gt_resolution
         self.LQ_stage = LQ_stage
         self.scale_factor = scale_factor if LQ_stage else 1
-        print("LQ_stage=",LQ_stage)
         self.use_residual = use_residual
 
         channel_query_dict = {

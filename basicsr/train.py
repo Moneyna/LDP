@@ -3,8 +3,6 @@ import logging
 import math
 import time
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
-
 
 import shutil
 from os import path as osp
@@ -178,16 +176,11 @@ def train_pipeline(root_path):
         train_sampler.set_epoch(epoch)
         prefetcher.reset()
         train_data = prefetcher.next()
-        #print("epoch=",epoch)
 
         while train_data is not None:
             data_timer.record()
 
             current_iter += 1
-            
-            #print("[cur_iter] ",current_iter)
-            #if opt.get('val') is not None and current_iter!=1 and (current_iter % opt['val']['val_freq'] == 1):
-            #    continue
 
             if current_iter > total_iters:
                 break

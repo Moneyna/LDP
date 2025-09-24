@@ -6,7 +6,6 @@ from torch.nn import functional as F
 from torch.autograd import Variable
 
 from archs.vgg_arch import VGGFeatureExtractor
-from archs.DualDSR1_arch import DualDSR1
 from utils.registry import LOSS_REGISTRY
 from .loss_util import weighted_loss
 import pywt
@@ -18,8 +17,6 @@ _reduction_modes = ['none', 'mean', 'sum']
 
 @weighted_loss
 def l1_loss(pred, target,reduction):
-    #print("pred.shape",pred.shape)
-    #print("target.shape",target.shape)
     return F.l1_loss(pred, target, reduction=reduction)
 
 
@@ -173,7 +170,7 @@ class orthogonalLoss(nn.Module): #orthogonal_opt
         def forward(self, matrix, weight=None):
             matrix = torch.abs(matrix)
             matrix = torch.sum(matrix, dim=0)
-            matrix = matrix - torch.ones(matrix.shape).cuda()  # 对角线元素的1
+            matrix = matrix - torch.ones(matrix.shape).cuda()
             loss = self.loss_func.forward(matrix, torch.zeros(matrix.shape).cuda()) * self.loss_weight
             return loss
 
@@ -453,7 +450,7 @@ class PerceptualLoss(nn.Module):
         Returns:
             torch.Tensor: Gram matrix.
         """
-        wsz = 8 #// 4 * 16  # 8
+        wsz = 8
         _, _, h_old, w_old = x.shape
         h_pad = (h_old // wsz + 1) * wsz - h_old
         w_pad = (w_old // wsz + 1) * wsz - w_old
@@ -747,7 +744,6 @@ def dwt_get_highfrequency2(image, wavelet_name='haar'):
 def dwt_get_highfrequency(image_tensor, wavelet_name='sym2'):
     image_np = image_tensor.cpu().numpy()
 
-    # 处理整个批次
     batch_size = image_np.shape[0]
     high_frequency_batch = []
     low_frequency_batch = []

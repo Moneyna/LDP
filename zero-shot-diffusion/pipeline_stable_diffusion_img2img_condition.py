@@ -44,7 +44,7 @@ from diffusers.utils.torch_utils import randn_tensor
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline, StableDiffusionMixin
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
-from LDPSR_arch import LDPSR
+from LDP_arch import LDP
 
 if is_torch_xla_available():
     import torch_xla.core.xla_model as xm
@@ -656,7 +656,6 @@ class StableDiffusionImg2ImgPipeline_cond(
         return extra_step_kwargs
 
     def LR_preprocess(self,image):
-        #print("type(image)=",type(image))
         w, h = image.size
         w, h = (x - x % 32 for x in (w, h))  # resize to integer multiple of 32
         image = image.resize((w, h), resample=PIL_INTERPOLATION["lanczos"])
@@ -874,7 +873,7 @@ class StableDiffusionImg2ImgPipeline_cond(
         return scaled_values.tolist()
 
     def init_condition(self,model_path,dps_scale):
-        self.ldpsr_model = LDPSR(in_nc=3, out_nc=3, upscele=4,
+        self.ldp_model = LDP(in_nc=3, out_nc=3, upscele=4,
                                Nd=32,
                                d_model=64,
                                DP_depth=2,
@@ -883,17 +882,12 @@ class StableDiffusionImg2ImgPipeline_cond(
                                diffusion_batch_mul=1,
                                num_sampling_steps='200',
                                ).to(self.device)
-        self.ldpsr_model.load_state_dict(torch.load(model_path)['params'], strict=True)
-        #self.ldpsr_model.eval()
-        #self.dps_scale = dps_scale
-        #self.dps_scale = (start=100, end=1, num_steps=10)
-
+        self.ldp_model.load_state_dict(torch.load(model_path)['params'], strict=True)
 
     def resize_lq(self,lq,x_up):
         H_lq, W_lq = lq.shape[2], lq.shape[3]
         H_up, W_up = x_up.shape[2], x_up.shape[3]
 
-        # 如果尺寸不同，对 x_up 进行裁剪或填充
         if H_up > H_lq:
             x_up = x_up[:, :, :H_lq, :]
         if W_up > W_lq:
@@ -901,10 +895,10 @@ class StableDiffusionImg2ImgPipeline_cond(
 
         if H_up < H_lq:
             pad_h = H_lq - H_up
-            x_up = F.pad(x_up, (0, 0, 0, pad_h))  # 只在高度方向填充
+            x_up = F.pad(x_up, (0, 0, 0, pad_h))
         if W_up < W_lq:
             pad_w = W_lq - W_up
-            x_up = F.pad(x_up, (0, pad_w, 0, 0))  # 只在宽度方向填充
+            x_up = F.pad(x_up, (0, pad_w, 0, 0))
         return lq-x_up
 
     def init_image_residual(self, image):
@@ -917,34 +911,25 @@ class StableDiffusionImg2ImgPipeline_cond(
         self.LR_input = self.LR_input * 2.0 - 1.0
 
     def grad_and_value(self, x_tp1,x_t, x_0_hat,lq_ori,dps, **kwargs):
-        #dps_loss = DWTHFLoss(1, 1, 1, 100)
 
         lq_ori = (lq_ori+1.0)/2.0
         lq_ori = lq_ori.to(x_tp1.device)
-        # 将X_0_hat变成图片
-        #print("x0_latent.requires_grad:",x_0_hat.requires_grad)
-        # image = self.vae.decode(x_0_hat).sample
+
         image=self.vae.decode(x_0_hat / self.vae.config.scaling_factor, return_dict=False, generator=None)[0]
-        #print("x0.requires_grad:",image.requires_grad)
+
         image = torch.clamp(image, -1.0, 1.0)
 
-        #TODO: dualdsr
-        self.ldpsr_model = self.ldpsr_model.to(x_tp1.device)
+        self.ldp_model = self.ldp_model.to(x_tp1.device)
         image = image.to(x_tp1.device)
         self.LR_input = self.LR_input.to(x_tp1.device)
 
-        lq_pred = self.ldpsr_model(self.LR_input,image,True).to(x_tp1.device)
+        lq_pred = self.ldp_model(self.LR_input,image,True).to(x_tp1.device)
 
         lq_pred = (lq_pred +1.0) /2.0
 
-        #print("lr_input.requires_grad:",self.LR_input.requires_grad)
-
-        #difference = self.resize_lq(lq_ori,lq_pred)
-        #norm = torch.linalg.norm(difference)
-
         norm = self.dps_loss(lq_pred,lq_ori)
         norm_grad = torch.autograd.grad(outputs=norm, inputs=x_t)[0]
-        x_tp1 -= norm_grad * dps #_scale
+        x_tp1 -= norm_grad * dps
 
         return x_tp1, norm
 
@@ -1062,11 +1047,9 @@ class StableDiffusionImg2ImgPipeline_cond(
                 second element is a list of `bool`s indicating whether the corresponding generated image contains
                 "not-safe-for-work" (nsfw) content.
         """
-        self.dps_loss = kwargs["dps_loss"] #DWTHFLoss(1, 1, 1, 100)
+        self.dps_loss = kwargs["dps_loss"]
         callback = kwargs.pop("callback", None)
         callback_steps = kwargs.pop("callback_steps", None)
-
-        #print("self.scheduler=",self.scheduler)
 
         if callback is not None:
             deprecate(
@@ -1147,9 +1130,6 @@ class StableDiffusionImg2ImgPipeline_cond(
         image_tensor = self.LR_preprocess(image_tensor).to(image.device)
         self.init_image_residual(image_tensor)
 
-        # if duald_path != None:
-        #     self.init_condition(duald_path)
-
         # 5. set timesteps
         timesteps, num_inference_steps = retrieve_timesteps(
             self.scheduler, num_inference_steps, device, timesteps, sigmas
@@ -1168,7 +1148,7 @@ class StableDiffusionImg2ImgPipeline_cond(
             generator,
         )
 
-        # 7. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
+        # 7. Prepare extra step kwargs.
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
         # 7.1 Add image embeds for IP-Adapter
@@ -1219,33 +1199,17 @@ class StableDiffusionImg2ImgPipeline_cond(
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                     noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
 
-                #print(timesteps[i],timesteps[i-1])
-
                 # compute the previous noisy sample x_t -> x_t-1
                 latents_param = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)
-                #print(latents_param)
                 latents1, x0_pred = latents_param[0], latents_param[1]
-
-                #if i >0: #< timesteps-1:
-                #    noise1 = torch.randn_like(x0_pred)
-                #    noise2 = torch.randn_like(x0_pred)
-                   #latents1 = latents1 + (self.scheduler.add_noise(x0_pred,noise1,timesteps[i])-self.scheduler.add_noise(x0_pred,noise2,timesteps[i-1]))   
-                #    latents1 = latents1 +0.001*(self.scheduler.add_noise(x0_pred,noise1,timesteps[i])-self.scheduler.add_noise(x0_pred,noise2,timesteps[i]))
-
-                #if not ( i%1 ==0 and i < len(timesteps)//2):
-                #    self.dps_scale = 0.0
-                #latents, distance = self.grad_and_value(latents1, latents, x0_pred, image_tensor)
 
                 if ( i%1 ==0) and i < len(timesteps)//2:
                     latents, distance = self.grad_and_value(latents1, latents, x0_pred, image_tensor,self.dps_scale[i])
-                    print("distance=",distance)
                 else:
                     latents = latents1
                 latents = latents.detach_()
-                #print("distance=", distance)
 
                 if callback_on_step_end is not None:
-                    print("????? callback_on_step_end ")
                     callback_kwargs = {}
                     for k in callback_on_step_end_tensor_inputs:
                         callback_kwargs[k] = locals()[k]

@@ -346,7 +346,7 @@ def input_mask(image, prob_=0.75, value=0.1):
     mask = np.random.choice([0, 1], size=(x, y), p=[prob_, 1 - prob_])
     mask = np.repeat(mask[:, :, np.newaxis], 3, axis=2)
     noise_image = np.multiply(image, mask)
-    noise_image = noise_image - value + value * mask  # 本质并不是把mask的元素完全变成0？而且怎么是在输入的时候就mask？
+    noise_image = noise_image - value + value * mask
     return noise_image
 
 

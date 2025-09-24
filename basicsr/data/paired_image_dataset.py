@@ -85,16 +85,13 @@ class PairedImageDataset(data.Dataset):
             t2=lq_path.split("/")
             t2[-1]=t1[-1][:-4]+t2[-1][-7:]
             lq_path='/'.join(t2)
-            #lq_path=lq_path.replace(t2[-1][:-7],t1[-1][:-4])
-            #print("lq_path=",lq_path)
-            #print("gt_path=",gt_path)
+
         # opencv
         img_lq = cv2.imread(lq_path).astype(np.float32) / 255.
 
         # augmentation for training
         if self.opt['phase'] == 'train':
-            #input_gt_size = img_gt.shape[0]
-            #input_lq_size = img_lq.shape[0]
+
             input_gt_h,input_gt_w = img_gt.shape[0],img_gt.shape[1]
             input_lq_h,input_lq_w = img_lq.shape[0],img_lq.shape[1]
             gt_size = self.opt['gt_size']
@@ -107,11 +104,6 @@ class PairedImageDataset(data.Dataset):
 
             if self.opt['use_resize_crop']:
                 # random resize
-                #input_gt_random_size = random.randint(gt_size, input_gt_size)
-                #input_gt_random_size = input_gt_random_size - input_gt_random_size % scale # make sure divisible by scale 
-                #resize_factor = input_gt_random_size / input_gt_size
-                #img_gt = random_resize(img_gt, resize_factor)
-                #img_lq = random_resize(img_lq, resize_factor)
                 input_gt_h, input_gt_w = img_gt.shape[0], img_gt.shape[1]
                 input_lq_h, input_lq_w = img_lq.shape[0], img_lq.shape[1]
                 # h
@@ -129,10 +121,8 @@ class PairedImageDataset(data.Dataset):
                 # random crop
                 img_gt, img_lq = paired_random_crop(img_gt, img_lq, gt_size, scale, gt_path)
 
-                #TODO:Mask
                 if self.opt.get('if_mask'):
                     img_lq = input_mask_with_noise(img_lq, mask1=self.opt['mask1'], mask2=self.opt['mask2'])
-                    #print("mask_done[1]!")
             # flip, rotation
             img_gt, img_lq = augment([img_gt, img_lq], self.opt['use_flip'],
                                      self.opt['use_rot'])
@@ -142,7 +132,6 @@ class PairedImageDataset(data.Dataset):
             if crop_eval_size:
                 img_gt, img_lq = paired_resize(img_gt, img_lq, crop_eval_size, scale)
 
-        # TODO: color space transform
         # BGR to RGB, HWC to CHW, numpy to tensor
         img_gt, img_lq = img2tensor([img_gt, img_lq], bgr2rgb=True, float32=True)
 
@@ -150,7 +139,6 @@ class PairedImageDataset(data.Dataset):
         if upsample:
             img_lq = F.interpolate(img_lq.unsqueeze(0), scale_factor=(scale, scale), mode='bicubic',
                                    align_corners=False)
-            # img_lq = img_lq
 
         temp={
             'lq': img_lq,
@@ -159,7 +147,6 @@ class PairedImageDataset(data.Dataset):
             'gt_path': gt_path
         }
  
-        #print("datas=",temp)
         return temp
 
     def __len__(self):

@@ -235,7 +235,6 @@ class BaseModel():
             for key, param in state_dict.items():
                 if key.startswith('module.'):  # remove unnecessary 'module.'
                     key = key[7:]
-                #TODO: 不保存esrgan
                 if 'esrgan' in key:
                     continue
                 state_dict[key] = param.cpu()
@@ -299,8 +298,6 @@ class BaseModel():
             for k in load_net_keys2:
                 for ign_k in ignore_keys:
                     k1=k.split('.')[0]
-                    #print("[ign_k]",ign_k)
-                    #print("[k]",k1)
                     if ign_k in k1:
                         logger.warning(f'ignore_keys [{k}]') # in load_net: {load_net[k].shape}')
                         load_net[k+'.ignore']=load_net.pop(k)

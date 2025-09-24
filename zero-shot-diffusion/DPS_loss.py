@@ -7,8 +7,6 @@ import torch.nn.functional as F
 import pyiqa
 
 def l1_loss(pred, target,reduction):
-    #print("pred.shape",pred.shape)
-    #print("target.shape",target.shape)
     return F.l1_loss(pred, target, reduction=reduction)
 
 class LPIPSLoss(nn.Module):

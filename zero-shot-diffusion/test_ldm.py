@@ -4,9 +4,6 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-"""
-Sample new images from a pre-trained DiT.
-"""
 import inspect
 import os
 os.environ['CUDA_VISIBLE_DEVICES']="3"
@@ -141,23 +138,17 @@ def imwrite(img, file_path, params=None, auto_mkdir=True):
 
 
 def change_module(module_A, obj_b):
-    # 获取module_A的构造函数参数签名
     init_signature = inspect.signature(module_A.__init__)
     params = {}
 
-    # 遍历参数，跳过'self'
     for param_name, param in init_signature.parameters.items():
         if param_name == 'self':
             continue
-        # 检查obj_b是否具有该属性
         if hasattr(obj_b, param_name):
             params[param_name] = getattr(obj_b, param_name)
-        # 可选：处理有默认值的参数
         elif param.default != inspect.Parameter.empty:
-            # 使用默认值（可选）
             params[param_name] = param.default
 
-    # 移除不需要的参数（例如内部参数）
     params.pop('_internal_param', None)
 
     return params
@@ -188,26 +179,15 @@ def main(args,gt_h,gt_w):
     else:
         pipeline = LDMSuperResolutionPipeline_cond.from_pretrained(model_id)
 
-
-        # pipeline.vqvae = change_module(pipeline.vqvae,per_VQModel())
-        # pipeline.unet = change_module( pipeline.unet,per_UNet2DModel())
-        #pipeline.unet = per_UNet2DModel(**change_module(UNet2DModel, pipeline.unet))
-
-        #for param in pipeline.unet.parameters():
-        #    print(param.requires_grad)
-
-        ldpsr_model = "/path/to/ldpsr_model.pth"
-        pipeline.init_condition(ldpsr_model,args.dps_scale) #1e-2)
+        ldp_model = "/path/to/ldp_model.pth"
+        pipeline.init_condition(ldp_model,args.dps_scale) #1e-2)
     sr_model = pipeline.to(device)
 
     if os.path.isfile(args.input):
         paths = [args.input]
     else:
         paths = sorted(glob.glob(os.path.join(args.input, '*.png')))
-        # gt_paths = sorted(glob.glob(os.path.join(args.gt, '*.png')))
 
-    #print("paths.len=",len(paths))
-    #TODO: 读取gt
     pbar = tqdm(total=len(paths), unit='image')
     metric_results = {
         metric: 0
